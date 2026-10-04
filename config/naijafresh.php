@@ -37,6 +37,10 @@ return [
     | Used once, to create the first super admin; ignored after one exists.
     */
     'setup' => [
+        // Development/staging only: load sample products, demo logins and demo orders
+        // into an EMPTY store on boot. Ignored in production.
+        'seed_sample_data' => (bool) env('SEED_SAMPLE_DATA', false),
+
         'super_admin' => [
             'name' => env('SUPER_ADMIN_NAME', 'NaijaFresh Owner'),
             'email' => env('SUPER_ADMIN_EMAIL'),

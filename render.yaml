@@ -76,6 +76,12 @@ services:
       - key: RUN_SCHEDULER
         value: "true"
 
+      # --- Dev/staging servers only: set APP_ENV=staging above and SEED_SAMPLE_DATA=true to load
+      #     sample products, demo logins (password "password") and demo orders into an EMPTY store
+      #     on boot. Safe to leave on: it never touches a store that already has products. ---
+      - key: SEED_SAMPLE_DATA
+        value: "false"
+
       # --- First super admin (created once, on first boot; ignored afterwards) ---
       - key: SUPER_ADMIN_NAME
         value: NaijaFresh Owner

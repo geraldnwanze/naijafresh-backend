@@ -5,11 +5,15 @@ namespace App\Services\Setup;
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\DeliveryWindow;
+use App\Models\Product;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use Database\Seeders\CategorySeeder;
 use Database\Seeders\DeliveryWindowSeeder;
+use Database\Seeders\DemoAccountSeeder;
+use Database\Seeders\DemoDataSeeder;
+use Database\Seeders\ProductSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -48,6 +52,34 @@ class InstallService
         });
 
         return $seeded;
+    }
+
+    /**
+     * Loads the full demo set (sample products, demo logins, ~170 demo orders and
+     * expenses) for development and staging deployments. Returns null in
+     * production (the demo logins all share the password "password"), an empty
+     * list when the store already has products (so it never doubles up or
+     * overwrites a catalogue you built), otherwise the names of what was seeded.
+     *
+     * @return list<string>|null
+     */
+    public function seedSampleData(): ?array
+    {
+        if (app()->isProduction()) {
+            return null;
+        }
+
+        if (Product::query()->exists()) {
+            return [];
+        }
+
+        app(AuditLogger::class)->withoutAuditing(function (): void {
+            foreach ([ProductSeeder::class, DemoAccountSeeder::class, DemoDataSeeder::class] as $seeder) {
+                app()->call([app($seeder), 'run']);
+            }
+        });
+
+        return ['sample products', 'demo accounts', 'demo orders and expenses'];
     }
 
     /**

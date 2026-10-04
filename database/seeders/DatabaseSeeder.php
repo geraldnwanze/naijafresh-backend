@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
             }
 
             // Sample order history + expenses so the accounting pages aren't empty.
-            if (app()->environment('local')) {
+            if (! app()->isProduction()) {
                 $this->call(DemoDataSeeder::class);
             }
         });

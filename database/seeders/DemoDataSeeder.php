@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Exceptions\CartException;
 use App\Models\DeliveryWindow;
 use App\Models\Expense;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -21,7 +22,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
 
 /**
- * Local-only demo history so the accounting pages have something to show: ~170
+ * Demo history (development and staging, never production) so the accounting pages have something to show: ~170
  * orders spread over the last 60 days (mostly delivered, a few cancelled or
  * still open) and three months of operating expenses. Orders are placed through
  * OrderService, so prices, stock and cost snapshots behave like real sales.
@@ -30,6 +31,13 @@ class DemoDataSeeder extends Seeder
 {
     public function run(OrderService $orders, PaymentService $payments): void
     {
+        // Orders and expenses aren't upserted, so a second run would double the history.
+        if (Order::query()->exists()) {
+            $this->command?->info('Demo history skipped: orders already exist.');
+
+            return;
+        }
+
         // History, not live sales: no emails and no bell entries for ~170 old orders.
         Notification::fake();
 

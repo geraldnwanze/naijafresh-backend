@@ -1,16 +1,21 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\ActivityLog;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\DeliveryWindow;
+use App\Models\Expense;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\StoreSettings;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoAccountSeeder;
+use Database\Seeders\DemoDataSeeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 describe('reference data', function (): void {
     it('seeds categories, delivery windows and settings on an empty database', function (): void {
@@ -128,5 +133,78 @@ describe('production seeding is safe', function (): void {
         $this->seed(DemoAccountSeeder::class);
 
         expect(User::query()->whereIn('email', ['superadmin@naijafresh.test', 'admin@naijafresh.test', 'customer@naijafresh.test'])->count())->toBe(3);
+    });
+});
+
+describe('sample data for dev and staging servers', function (): void {
+    it('loads the full demo set into an empty store when asked, without emails or audit noise', function (): void {
+        $this->app->detectEnvironment(fn () => 'staging');
+        Mail::fake();
+
+        $this->artisan('naijafresh:setup', ['--with-sample-data' => true])
+            ->expectsOutputToContain('sample products')
+            ->assertSuccessful();
+
+        expect(Product::query()->count())->toBeGreaterThan(20)
+            ->and(User::query()->whereIn('email', ['superadmin@naijafresh.test', 'admin@naijafresh.test', 'customer@naijafresh.test'])->count())->toBe(3)
+            ->and(Order::query()->count())->toBeGreaterThan(100)
+            ->and(Expense::query()->count())->toBeGreaterThan(0)
+            ->and(AuditLog::query()->count())->toBe(0)
+            ->and(ActivityLog::query()->count())->toBe(0);
+    });
+
+    it('is switched on by SEED_SAMPLE_DATA and is then safe to leave on across boots', function (): void {
+        $this->app->detectEnvironment(fn () => 'staging');
+        config()->set('naijafresh.setup.seed_sample_data', true);
+
+        $this->artisan('naijafresh:setup')->assertSuccessful();
+        $products = Product::query()->count();
+        $orders = Order::query()->count();
+        $edited = Product::query()->orderBy('id')->first();
+        $edited->update(['price_kobo' => 123_400]);
+
+        $this->artisan('naijafresh:setup')->expectsOutputToContain('already has products')->assertSuccessful();
+
+        expect(Product::query()->count())->toBe($products)
+            ->and(Order::query()->count())->toBe($orders)
+            ->and($edited->fresh()->price_kobo)->toBe(123_400);
+    });
+
+    it('never loads demo accounts or products in production, and says why', function (): void {
+        $this->app->detectEnvironment(fn () => 'production');
+        config()->set('naijafresh.setup.seed_sample_data', true);
+
+        $this->artisan('naijafresh:setup')->expectsOutputToContain('never loaded in production')->assertSuccessful();
+
+        expect(Product::query()->count())->toBe(0)
+            ->and(User::query()->count())->toBe(0);
+    });
+
+    it('leaves a catalogue you built yourself alone', function (): void {
+        $this->app->detectEnvironment(fn () => 'staging');
+        Product::factory()->for(Category::factory())->create(['name' => 'My own product']);
+
+        $this->artisan('naijafresh:setup', ['--with-sample-data' => true])->expectsOutputToContain('already has products')->assertSuccessful();
+
+        expect(Product::query()->count())->toBe(1)->and(User::query()->count())->toBe(0);
+    });
+
+    it('does nothing unless asked', function (): void {
+        $this->app->detectEnvironment(fn () => 'staging');
+
+        $this->artisan('naijafresh:setup')->assertSuccessful();
+
+        expect(Product::query()->count())->toBe(0);
+    });
+
+    it('does not double the demo history when the demo seeder runs again', function (): void {
+        $this->app->detectEnvironment(fn () => 'staging');
+        $this->artisan('naijafresh:setup', ['--with-sample-data' => true])->assertSuccessful();
+        $orders = Order::query()->count();
+        $expenses = Expense::query()->count();
+
+        $this->artisan('db:seed', ['--class' => DemoDataSeeder::class, '--force' => true])->assertSuccessful();
+
+        expect(Order::query()->count())->toBe($orders)->and(Expense::query()->count())->toBe($expenses);
     });
 });
