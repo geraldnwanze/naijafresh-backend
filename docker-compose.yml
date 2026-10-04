@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: naijafresh_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-naijafresh}
+      POSTGRES_USER: ${DB_USERNAME:-naijafresh}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-naijafresh}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - naijafresh_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-naijafresh} -d ${DB_DATABASE:-naijafresh}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Local inbox: catches every email the app sends. Web UI at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: naijafresh_mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAIL_PORT:-1025}:1025"
+      - "8025:8025"
+
+volumes:
+  naijafresh_pgdata:
