@@ -1,0 +1,108 @@
+# Render Blueprint for the NaijaFresh API (Docker).
+#
+# One web service runs everything: nginx + php-fpm, the queue worker (sends the
+# emails) and the scheduler. Deploy: Render dashboard → New → Blueprint → pick this repo,
+# then fill in the variables marked "sync: false" (Render prompts for them).
+#
+# Costs: `starter` web + `basic-256mb` Postgres. The free Postgres plan is deleted after
+# 30 days and free web services sleep (a sleeping worker can't send emails), so neither
+# suits a live shop.
+#
+# Keep the database and the web service in the same region so the private
+# connection string works.
+
+databases:
+  - name: naijafresh-db
+    databaseName: naijafresh
+    user: naijafresh
+    region: frankfurt
+    plan: basic-256mb
+    ipAllowList: [] # private network only
+
+services:
+  - type: web
+    name: naijafresh-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: frankfurt
+    plan: starter
+    healthCheckPath: /up
+    autoDeploy: true
+    envVars:
+      # --- App ---
+      - key: APP_NAME
+        value: NaijaFresh
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true # plain base64; the container adds Laravel's "base64:" prefix
+      # APP_URL defaults to this service's public URL (RENDER_EXTERNAL_URL).
+      - key: FRONTEND_URL
+        sync: false # e.g. https://naijafresh.vercel.app (used in emails and CORS)
+      - key: NAIJAFRESH_TIMEZONE
+        value: Africa/Lagos
+
+      # --- Database (private network) ---
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: naijafresh-db
+          property: connectionString
+
+      # --- Queue, cache, sessions: no Redis needed ---
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: SESSION_DRIVER
+        value: array
+
+      # --- Logs: Render's Logs tab (stderr) + a file for the super admin log viewer ---
+      - key: LOG_CHANNEL
+        value: stack
+      - key: LOG_STACK
+        value: single,stderr
+      - key: LOG_LEVEL
+        value: info
+
+      # --- What runs inside this container (see docker/supervisord.conf) ---
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: RUN_QUEUE_WORKER
+        value: "true"
+      - key: RUN_SCHEDULER
+        value: "true"
+
+      # --- First super admin (created once, on first boot; ignored afterwards) ---
+      - key: SUPER_ADMIN_NAME
+        value: NaijaFresh Owner
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false # 12+ characters. Delete this variable after the first deploy.
+
+      # --- Payments: card payments stay off in production until a Paystack key is set ---
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
+
+      # --- Email: use an SMTP provider on port 2525 (Render blocks 25/465/587 on some plans).
+      #     Without these the shop works but no emails are delivered. ---
+      - key: MAIL_MAILER
+        value: smtp
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        value: "2525"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false # an address on a domain you've verified with the provider
+      - key: MAIL_FROM_NAME
+        value: NaijaFresh

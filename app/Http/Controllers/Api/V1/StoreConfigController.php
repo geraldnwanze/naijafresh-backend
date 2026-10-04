@@ -43,7 +43,8 @@ class StoreConfigController extends Controller
                 ],
                 'payment' => [
                     'provider' => $gateways->defaultDriver(),
-                    'is_mock' => $gateways->isMock(),
+                    // A blocked mock gateway isn't running, so don't advertise "test mode".
+                    'is_mock' => $gateways->isMock() && ! $gateways->isMockBlocked(),
                     'paystack_public_key' => config('naijafresh.payments.paystack.public_key'),
                     'methods' => $methods,
                 ],

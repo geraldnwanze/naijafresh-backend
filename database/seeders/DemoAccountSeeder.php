@@ -11,6 +11,13 @@ class DemoAccountSeeder extends Seeder
 {
     public function run(): void
     {
+        // These accounts all share the password "password".
+        if (app()->isProduction()) {
+            $this->command?->warn('Skipping demo accounts in production.');
+
+            return;
+        }
+
         User::updateOrCreate(
             ['email' => 'superadmin@naijafresh.test'],
             [

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\PaymentMethod;
 use App\Models\Setting;
+use App\Services\Payments\PaymentGatewayManager;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -88,7 +89,9 @@ class StoreSettings
     public function enabledPaymentMethods(): array
     {
         return [
-            PaymentMethod::Paystack->value => (bool) config('naijafresh.payments.methods.'.PaymentMethod::Paystack->value),
+            // Card payments are off while only the fake gateway is available in production.
+            PaymentMethod::Paystack->value => (bool) config('naijafresh.payments.methods.'.PaymentMethod::Paystack->value)
+                && ! app(PaymentGatewayManager::class)->isMockBlocked(),
             PaymentMethod::BankTransfer->value => (bool) $this->get(self::BANK_TRANSFER_ENABLED, config('naijafresh.payments.methods.'.PaymentMethod::BankTransfer->value)),
             PaymentMethod::CashOnDelivery->value => (bool) $this->get(self::CASH_ON_DELIVERY_ENABLED, config('naijafresh.payments.methods.'.PaymentMethod::CashOnDelivery->value)),
         ];

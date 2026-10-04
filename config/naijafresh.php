@@ -31,6 +31,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | First-run setup (php artisan naijafresh:setup)
+    |--------------------------------------------------------------------------
+    | Read through config (not env()) so it keeps working with a cached config.
+    | Used once, to create the first super admin; ignored after one exists.
+    */
+    'setup' => [
+        'super_admin' => [
+            'name' => env('SUPER_ADMIN_NAME', 'NaijaFresh Owner'),
+            'email' => env('SUPER_ADMIN_EMAIL'),
+            'password' => env('SUPER_ADMIN_PASSWORD'),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | System logs (super admin area)
     |--------------------------------------------------------------------------
     | The audit trail (who changed what) is kept forever. Activity logs
@@ -66,6 +81,10 @@ return [
     */
     'payments' => [
         'provider' => env('PAYMENT_PROVIDER') ?: (env('PAYSTACK_SECRET_KEY') ? 'paystack' : 'mock'),
+
+        // The mock gateway marks orders paid without any money moving. It is
+        // refused in production unless this is deliberately switched on.
+        'allow_mock_in_production' => (bool) env('NAIJAFRESH_ALLOW_MOCK_PAYMENTS', false),
 
         'methods' => [
             PaymentMethod::Paystack->value => true,

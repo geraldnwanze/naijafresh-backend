@@ -15,9 +15,15 @@ class DatabaseSeeder extends Seeder
                 CategorySeeder::class,
                 DeliveryWindowSeeder::class,
                 SettingSeeder::class,
-                ProductSeeder::class,
-                DemoAccountSeeder::class,
             ]);
+
+            // Sample catalogue and demo logins (password "password") are for development only.
+            if (! app()->isProduction()) {
+                $this->call([
+                    ProductSeeder::class,
+                    DemoAccountSeeder::class,
+                ]);
+            }
 
             // Sample order history + expenses so the accounting pages aren't empty.
             if (app()->environment('local')) {
