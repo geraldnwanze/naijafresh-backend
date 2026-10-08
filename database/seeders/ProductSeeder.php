@@ -50,6 +50,10 @@ class ProductSeeder extends Seeder
             ], $data));
         }
 
+        // Food pack combos (non-perishable bundles) live in their own seeder so they can be
+        // added to an existing store without touching the rest of the catalogue.
+        $this->call(FoodPackSeeder::class);
+
         foreach ($this->mealKits() as $data) {
             $this->upsertProduct($categories, array_merge([
                 'type' => ProductType::MealKit,

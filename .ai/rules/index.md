@@ -9,4 +9,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Services/Audit/** | .ai/rules/audit.md |
 | Dockerfile | .ai/rules/dockerfile.md |
 | ** | .ai/rules/general.md |
+| app/Models/Product.php | .ai/rules/models.md |
 | app/Services/Notifications/** | .ai/rules/notifications.md |

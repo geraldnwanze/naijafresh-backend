@@ -125,6 +125,15 @@ class Product extends Model
     }
 
     /**
+     * A fixed combo of non-perishable foodstuffs sold as one pack; what's in it
+     * is the `included_items` list.
+     */
+    public function isFoodPack(): bool
+    {
+        return $this->type === ProductType::FoodPack;
+    }
+
+    /**
      * Profit on one unit (one item, or one kg for weight-sold products) before
      * delivery and overheads; null until a cost price is entered.
      */

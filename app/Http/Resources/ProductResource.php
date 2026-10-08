@@ -26,6 +26,7 @@ class ProductResource extends JsonResource
             'slug' => $this->slug,
             'type' => $this->type->value,
             'is_meal_kit' => $this->isMealKit(),
+            'is_food_pack' => $this->isFoodPack(),
             'description' => $this->description,
             'price_kobo' => $this->price_kobo,
             'price' => Money::format($this->price_kobo),
@@ -80,6 +81,12 @@ class ProductResource extends JsonResource
                 'not_included_items' => $this->not_included_items ?? [],
                 'storage_instructions' => $this->storage_instructions,
                 'cooking_instructions' => $this->cooking_instructions,
+            ]),
+
+            // Food pack combo: the "What's inside" list.
+            'food_pack' => $this->when($this->isFoodPack(), fn (): array => [
+                'contents' => $this->included_items ?? [],
+                'item_count' => count($this->included_items ?? []),
             ]),
 
             'variants' => ProductVariantResource::collection($this->whenLoaded('variants')),
