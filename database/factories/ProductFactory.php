@@ -61,6 +61,18 @@ class ProductFactory extends Factory
         ]);
     }
 
+    public function foodPack(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'type' => ProductType::FoodPack,
+            'sold_by' => SoldBy::Unit,
+            'storage_type' => StorageType::Ambient,
+            'unit' => 'pack',
+            'price_kobo' => fake()->numberBetween(2_000_000, 6_000_000),
+            'included_items' => ['Parboiled rice (5 kg)', 'Spaghetti (4 packs)', 'Groundnut oil (1 L)', 'Tomato paste (4 tins)'],
+        ]);
+    }
+
     public function unavailable(): static
     {
         return $this->state(fn (array $attributes) => [

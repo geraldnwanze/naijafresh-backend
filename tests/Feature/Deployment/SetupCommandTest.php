@@ -180,13 +180,18 @@ describe('sample data for dev and staging servers', function (): void {
             ->and(User::query()->count())->toBe(0);
     });
 
-    it('leaves a catalogue you built yourself alone', function (): void {
+    it('leaves a catalogue you built yourself alone, only adding the sample food packs once', function (): void {
         $this->app->detectEnvironment(fn () => 'staging');
-        Product::factory()->for(Category::factory())->create(['name' => 'My own product']);
+        $mine = Product::factory()->for(Category::factory())->create(['name' => 'My own product', 'price_kobo' => 777_700]);
 
+        $this->artisan('naijafresh:setup', ['--with-sample-data' => true])->expectsOutputToContain('food pack combos')->assertSuccessful();
         $this->artisan('naijafresh:setup', ['--with-sample-data' => true])->expectsOutputToContain('already has products')->assertSuccessful();
 
-        expect(Product::query()->count())->toBe(1)->and(User::query()->count())->toBe(0);
+        expect(Product::query()->where('type', 'food_pack')->count())->toBe(6)
+            ->and(Product::query()->count())->toBe(7)
+            ->and($mine->fresh()->price_kobo)->toBe(777_700)
+            ->and(User::query()->count())->toBe(0)
+            ->and(Order::query()->count())->toBe(0);
     });
 
     it('does nothing unless asked', function (): void {

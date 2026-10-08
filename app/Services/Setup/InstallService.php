@@ -2,6 +2,7 @@
 
 namespace App\Services\Setup;
 
+use App\Enums\ProductType;
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\DeliveryWindow;
@@ -13,6 +14,7 @@ use Database\Seeders\CategorySeeder;
 use Database\Seeders\DeliveryWindowSeeder;
 use Database\Seeders\DemoAccountSeeder;
 use Database\Seeders\DemoDataSeeder;
+use Database\Seeders\FoodPackSeeder;
 use Database\Seeders\ProductSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Database\Eloquent\Model;
@@ -70,7 +72,15 @@ class InstallService
         }
 
         if (Product::query()->exists()) {
-            return [];
+            // A catalogue you built is left alone, but stores seeded before food
+            // packs existed get the sample packs once.
+            if (Product::query()->where('type', ProductType::FoodPack->value)->exists()) {
+                return [];
+            }
+
+            app(AuditLogger::class)->withoutAuditing(fn () => app(FoodPackSeeder::class)->run());
+
+            return ['food pack combos'];
         }
 
         app(AuditLogger::class)->withoutAuditing(function (): void {

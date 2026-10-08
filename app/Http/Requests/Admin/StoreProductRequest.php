@@ -77,6 +77,26 @@ class StoreProductRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
+                if ($this->input('type') !== ProductType::FoodPack->value) {
+                    return;
+                }
+
+                // A food pack is a fixed, shelf-stable bundle sold per pack.
+                $contents = array_filter((array) $this->input('included_items'), fn ($item) => is_string($item) && trim($item) !== '');
+
+                if (count($contents) < 2) {
+                    $validator->errors()->add('included_items', 'List at least two items that come in the pack.');
+                }
+
+                if (! in_array($this->input('storage_type'), [null, StorageType::Ambient->value], true)) {
+                    $validator->errors()->add('storage_type', 'Food packs are non-perishable, so they must be stored at room temperature.');
+                }
+
+                if ($this->soldByWeight()) {
+                    $validator->errors()->add('sold_by', 'Food packs are sold per pack, not by weight.');
+                }
+            },
+            function (Validator $validator): void {
                 if (! $this->soldByWeight() || $validator->errors()->hasAny(['weight_step_grams', 'min_weight_grams'])) {
                     return;
                 }
