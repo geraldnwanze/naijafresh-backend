@@ -1,6 +1,6 @@
 # NaijaFresh API: nginx + php-fpm + queue worker + scheduler in one container
 # (cheapest layout for Render; see docker/supervisord.conf to split them later).
-FROM php:8.4-fpm
+FROM php:8.5-fpm
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,8 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         mbstring \
         intl \
         zip \
-        opcache \
         bcmath \
+    # OPcache is compiled into PHP 8.5+, so only install it where it is missing.
+    && (php -r 'exit(extension_loaded("Zend OPcache") ? 0 : 1);' || docker-php-ext-install opcache) \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
