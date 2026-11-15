@@ -5,6 +5,7 @@ use App\Exceptions\PaymentGatewayException;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Services\Payments\PaystackPaymentGateway;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -53,6 +54,17 @@ it('explains why Paystack refused to start a payment, and logs it without the se
         && $context['http_status'] === 400
         && $context['payment_reference'] === $payment->reference
         && ! str_contains(json_encode($context), 'sk_test_example'))->once();
+});
+
+it('treats an unreachable Paystack like a refusal', function (): void {
+    Http::fake(fn () => throw new ConnectionException('cURL error 28: Operation timed out'));
+    Log::spy();
+    $payment = paystackPayment();
+
+    expect(fn () => app(PaystackPaymentGateway::class)->initialize($payment))
+        ->toThrow(PaymentGatewayException::class, 'could not be reached')
+        ->and(fn () => app(PaystackPaymentGateway::class)->verify($payment))
+        ->toThrow(PaymentGatewayException::class, 'could not be reached');
 });
 
 it('reports a failed verification call with the same detail', function (): void {

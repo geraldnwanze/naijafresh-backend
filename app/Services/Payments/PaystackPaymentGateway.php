@@ -7,6 +7,7 @@ use App\Exceptions\PaymentGatewayException;
 use App\Models\Payment;
 use App\Services\Payments\Contracts\PaymentGateway;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpClient;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -25,7 +26,7 @@ class PaystackPaymentGateway implements PaymentGateway
     {
         $frontend = rtrim((string) config('app.frontend_url'), '/');
 
-        $result = $this->client()
+        $result = $this->send(fn () => $this->client()
             ->post('/transaction/initialize', [
                 'email' => $payment->order->contact_email,
                 'amount' => $payment->amount_kobo,
@@ -36,7 +37,7 @@ class PaystackPaymentGateway implements PaymentGateway
                     'order_reference' => $payment->order->reference,
                     'order_id' => $payment->order_id,
                 ],
-            ]);
+            ]), 'initialize', $payment);
 
         if ($result->failed() || ! ($result->json('status') ?? false)) {
             throw $this->failure($result, 'initialize', $payment);
@@ -58,8 +59,11 @@ class PaystackPaymentGateway implements PaymentGateway
 
     public function verify(Payment $payment, array $context = []): array
     {
-        $result = $this->client()
-            ->get('/transaction/verify/'.urlencode($payment->reference));
+        $result = $this->send(
+            fn () => $this->client()->get('/transaction/verify/'.urlencode($payment->reference)),
+            'verify',
+            $payment,
+        );
 
         if ($result->failed()) {
             throw $this->failure($result, 'verify', $payment);
@@ -106,6 +110,29 @@ class PaystackPaymentGateway implements PaymentGateway
                 'raw' => $data,
             ],
         ];
+    }
+
+    /**
+     * Runs a Paystack call, turning "could not reach Paystack" (timeout, DNS,
+     * refused connection) into the same exception as a refused request.
+     *
+     * @param  callable(): Response  $call
+     */
+    private function send(callable $call, string $action, Payment $payment): Response
+    {
+        try {
+            return $call();
+        } catch (ConnectionException $e) {
+            Log::error("Paystack could not {$action} a payment: unreachable", [
+                'payment_reference' => $payment->reference,
+                'order_id' => $payment->order_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $action === 'initialize'
+                ? PaymentGatewayException::couldNotStart('Paystack could not be reached')
+                : PaymentGatewayException::couldNotConfirm('Paystack could not be reached');
+        }
     }
 
     /**
