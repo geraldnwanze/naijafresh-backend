@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\PaymentStatus;
+use App\Exceptions\PaymentGatewayException;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Services\Payments\PaystackPaymentGateway;
@@ -46,7 +47,7 @@ it('explains why Paystack refused to start a payment, and logs it without the se
     $payment = paystackPayment();
 
     expect(fn () => app(PaystackPaymentGateway::class)->initialize($payment))
-        ->toThrow(RuntimeException::class, '"email" must be a valid email');
+        ->toThrow(PaymentGatewayException::class, '"email" must be a valid email');
 
     Log::shouldHaveReceived('error')->withArgs(fn (string $message, array $context): bool => str_contains($message, 'must be a valid email')
         && $context['http_status'] === 400
@@ -59,7 +60,7 @@ it('reports a failed verification call with the same detail', function (): void 
     Log::spy();
 
     expect(fn () => app(PaystackPaymentGateway::class)->verify(paystackPayment()))
-        ->toThrow(RuntimeException::class, 'Transaction reference not found');
+        ->toThrow(PaymentGatewayException::class, 'Transaction reference not found');
 });
 
 it('maps Paystack transaction states to payment statuses', function (string $paystackStatus, PaymentStatus $expected): void {

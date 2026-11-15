@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\PaymentGatewayException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Order\PlaceOrderRequest;
 use App\Http\Resources\OrderResource;
@@ -32,19 +33,29 @@ class OrderController extends Controller
     ) {
         $result = DB::transaction(function () use ($request, $orders, $payments): array {
             $order = $orders->place($request->user(), $request->validated());
-            $payment = $payments->createForOrder($order);
-            $initialization = $payments->initialize($payment);
 
-            return ['order' => $order, 'payment' => $payment->refresh(), 'init' => $initialization];
+            return ['order' => $order, 'payment' => $payments->createForOrder($order)];
         });
 
+        // Starting the online payment happens after the order is saved: if the
+        // provider is down the customer keeps their order and can retry from it.
+        $init = null;
+        $paymentError = null;
+
+        try {
+            $init = $payments->initialize($result['payment']);
+        } catch (PaymentGatewayException $e) {
+            report($e);
+            $paymentError = $e->customerMessage();
+        }
+
         $order = $result['order']->load(['items', 'delivery', 'payment', 'deliveryWindow']);
-        $init = $result['init'];
 
         return response()->json([
             'data' => new OrderResource($order),
-            'payment' => new PaymentResource($result['payment']),
+            'payment' => new PaymentResource($result['payment']->refresh()),
             'checkout' => [
+                'error' => $paymentError,
                 'requires_redirect' => $init['requires_redirect'] ?? false,
                 'authorization_url' => $init['authorization_url'] ?? null,
                 'is_mock' => $init['is_mock'] ?? false,

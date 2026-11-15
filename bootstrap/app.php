@@ -2,6 +2,7 @@
 
 use App\Exceptions\CartException;
 use App\Exceptions\InvalidOrderTransitionException;
+use App\Exceptions\PaymentGatewayException;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsSuperAdmin;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -37,6 +38,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 'message' => $e->getMessage(),
                 'errors' => $e->errors,
             ], 422);
+        });
+
+        // The customer-safe wording only; the real reason is in the log.
+        $exceptions->render(function (PaymentGatewayException $e) {
+            return response()->json([
+                'message' => $e->customerMessage(),
+            ], 502);
         });
 
         $exceptions->render(function (InvalidOrderTransitionException $e) {

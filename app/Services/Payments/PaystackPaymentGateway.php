@@ -3,6 +3,7 @@
 namespace App\Services\Payments;
 
 use App\Enums\PaymentStatus;
+use App\Exceptions\PaymentGatewayException;
 use App\Models\Payment;
 use App\Services\Payments\Contracts\PaymentGateway;
 use Carbon\CarbonImmutable;
@@ -10,7 +11,6 @@ use Illuminate\Http\Client\Factory as HttpClient;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 
 class PaystackPaymentGateway implements PaymentGateway
 {
@@ -112,7 +112,7 @@ class PaystackPaymentGateway implements PaymentGateway
      * Logs what Paystack said (never the request, which carries the secret key)
      * and returns an exception whose message is Paystack's own explanation.
      */
-    private function failure(Response $response, string $action, Payment $payment): RuntimeException
+    private function failure(Response $response, string $action, Payment $payment): PaymentGatewayException
     {
         $message = (string) ($response->json('message') ?? 'no message returned');
 
@@ -123,7 +123,9 @@ class PaystackPaymentGateway implements PaymentGateway
             'response' => mb_substr($response->body(), 0, 500),
         ]);
 
-        return new RuntimeException("Paystack could not {$action} this payment: {$message}");
+        return $action === 'initialize'
+            ? PaymentGatewayException::couldNotStart($message)
+            : PaymentGatewayException::couldNotConfirm($message);
     }
 
     private function mapStatus(string $status): PaymentStatus
