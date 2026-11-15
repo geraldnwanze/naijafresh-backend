@@ -8,6 +8,8 @@ use App\Services\Payments\Contracts\PaymentGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Factory as HttpClient;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class PaystackPaymentGateway implements PaymentGateway
@@ -23,7 +25,7 @@ class PaystackPaymentGateway implements PaymentGateway
     {
         $frontend = rtrim((string) config('app.frontend_url'), '/');
 
-        $response = $this->client()
+        $result = $this->client()
             ->post('/transaction/initialize', [
                 'email' => $payment->order->contact_email,
                 'amount' => $payment->amount_kobo,
@@ -34,15 +36,13 @@ class PaystackPaymentGateway implements PaymentGateway
                     'order_reference' => $payment->order->reference,
                     'order_id' => $payment->order_id,
                 ],
-            ])
-            ->throw()
-            ->json();
+            ]);
 
-        if (! ($response['status'] ?? false)) {
-            throw new RuntimeException('Paystack could not initialize this payment.');
+        if ($result->failed() || ! ($result->json('status') ?? false)) {
+            throw $this->failure($result, 'initialize', $payment);
         }
 
-        $data = $response['data'];
+        $data = $result->json('data');
 
         return [
             'provider' => $this->name(),
@@ -58,12 +58,14 @@ class PaystackPaymentGateway implements PaymentGateway
 
     public function verify(Payment $payment, array $context = []): array
     {
-        $response = $this->client()
-            ->get('/transaction/verify/'.urlencode($payment->reference))
-            ->throw()
-            ->json();
+        $result = $this->client()
+            ->get('/transaction/verify/'.urlencode($payment->reference));
 
-        $data = $response['data'] ?? [];
+        if ($result->failed()) {
+            throw $this->failure($result, 'verify', $payment);
+        }
+
+        $data = $result->json('data') ?? [];
 
         return [
             'status' => $this->mapStatus($data['status'] ?? 'failed'),
@@ -104,6 +106,24 @@ class PaystackPaymentGateway implements PaymentGateway
                 'raw' => $data,
             ],
         ];
+    }
+
+    /**
+     * Logs what Paystack said (never the request, which carries the secret key)
+     * and returns an exception whose message is Paystack's own explanation.
+     */
+    private function failure(Response $response, string $action, Payment $payment): RuntimeException
+    {
+        $message = (string) ($response->json('message') ?? 'no message returned');
+
+        Log::error("Paystack could not {$action} a payment: {$message}", [
+            'http_status' => $response->status(),
+            'payment_reference' => $payment->reference,
+            'order_id' => $payment->order_id,
+            'response' => mb_substr($response->body(), 0, 500),
+        ]);
+
+        return new RuntimeException("Paystack could not {$action} this payment: {$message}");
     }
 
     private function mapStatus(string $status): PaymentStatus
