@@ -112,3 +112,10 @@ services:
         sync: false # an address on a domain you've verified with the provider
       - key: MAIL_FROM_NAME
         value: NaijaFresh
+      # Emails leave at no more than LIMIT per LIMIT_SECONDS (providers refuse bursts).
+      # 1 per 10 seconds suits Mailtrap's free sandbox; a real provider allows far more,
+      # e.g. LIMIT 10 per 1 second. Set LIMIT to 0 to switch the limit off.
+      - key: NAIJAFRESH_MAIL_LIMIT
+        value: "1"
+      - key: NAIJAFRESH_MAIL_LIMIT_SECONDS
+        value: "10"

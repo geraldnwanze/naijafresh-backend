@@ -103,4 +103,19 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Outgoing email
+    |--------------------------------------------------------------------------
+    | Providers refuse bursts (Mailtrap's sandbox answers "too many emails per
+    | second"), and one order can queue several emails at once. Queued emails
+    | leave at no more than `limit` per `per_seconds` seconds; a limit of 0
+    | turns this off. A real provider usually allows several a second; Mailtrap's
+    | free sandbox needs about one every ten seconds (limit 1, per_seconds 10).
+    */
+    'mail' => [
+        'limit' => (int) env('NAIJAFRESH_MAIL_LIMIT', 1),
+        'per_seconds' => (int) env('NAIJAFRESH_MAIL_LIMIT_SECONDS', 1),
+    ],
+
 ];
